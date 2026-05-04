@@ -45,6 +45,14 @@ def setup_db():
         )
     ''')
 
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id BIGINT PRIMARY KEY,
+            username TEXT,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     # Insert default products if table is empty
     cursor.execute('SELECT COUNT(*) FROM products')
     count = cursor.fetchone()[0]
@@ -207,3 +215,67 @@ def deduct_stock(product_id):
     conn.commit()
     cursor.close()
     conn.close()
+
+def update_product_name(product_id, new_name):
+    """Rename a product."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE products SET name = %s WHERE id = %s', (new_name, product_id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+def get_user_count():
+    """Return total number of unique users who have used the bot."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM users')
+    count = cursor.fetchone()[0]
+    cursor.close()
+    conn.close()
+    return count
+
+def get_admins():
+    """Return all extra admins (excluding the main owner)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT user_id, username, added_at FROM admins ORDER BY added_at ASC')
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return rows
+
+def add_admin(user_id, username=''):
+    """Add a new admin. Returns False if already exists."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT INTO admins (user_id, username) VALUES (%s, %s) ON CONFLICT (user_id) DO NOTHING',
+        (user_id, username)
+    )
+    affected = cursor.rowcount
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return affected > 0
+
+def remove_admin(user_id):
+    """Remove an admin by user_id. Returns False if not found."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM admins WHERE user_id = %s', (user_id,))
+    affected = cursor.rowcount
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return affected > 0
+
+def is_admin(user_id):
+    """Check if a user_id exists in the admins table."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT 1 FROM admins WHERE user_id = %s', (user_id,))
+    result = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return result is not None

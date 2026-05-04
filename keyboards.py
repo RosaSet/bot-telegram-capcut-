@@ -48,11 +48,14 @@ def get_admin_main_menu():
     builder = ReplyKeyboardBuilder()
     builder.button(text="➕ បន្ថែមផលិតផលថ្មី (Add Product)")
     builder.button(text="✏️ កែប្រែតម្លៃ (Edit Price)")
+    builder.button(text="🏷️ កែប្រែឈ្មោះ (Rename Product)")
     builder.button(text="🖼️ ដាក់រូបភាព (Set Picture)")
     builder.button(text="📦 បន្ថែមស្តុក (Add Stock)")
     builder.button(text="Delete Product")
     builder.button(text="Notify Customers")
-    builder.adjust(2, 2, 2)
+    builder.button(text="👥 ស្ថិតិអ្នកប្រើ (Bot Stats)")
+    builder.button(text="👑 គ្រប់គ្រង Admin")
+    builder.adjust(2, 2, 2, 2, 1)
     return builder.as_markup(resize_keyboard=True)
 
 def get_admin_products_keyboard(products, action_prefix):
@@ -68,4 +71,21 @@ def get_delete_product_confirm_keyboard(product_id):
     builder.button(text="Confirm Delete", callback_data=f"admin_confirm_delete_{product_id}")
     builder.button(text="Cancel", callback_data="admin_main_menu")
     builder.adjust(1)
+    return builder.as_markup()
+
+def get_admin_list_keyboard(admins, main_admin_id):
+    """Keyboard showing all admins with remove buttons."""
+    builder = InlineKeyboardBuilder()
+    for admin in admins:
+        uid, uname, added_at = admin
+        label = f"@{uname}" if uname else f"ID: {uid}"
+        builder.button(text=f"❌ លុប {label}", callback_data=f"admin_remove_{uid}")
+    builder.button(text="➕ បន្ថែម Admin ថ្មី", callback_data="admin_add_new")
+    builder.button(text="🔙 ត្រឡប់", callback_data="admin_main_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+def get_cancel_admin_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="❌ បោះបង់", callback_data="admin_main_menu")
     return builder.as_markup()

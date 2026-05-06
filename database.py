@@ -29,17 +29,9 @@ def setup_db():
             price TEXT,
             image_url TEXT,
             stock INTEGER DEFAULT -1,
-            deleted INTEGER DEFAULT 0,
-            emoji TEXT DEFAULT ''
+            deleted INTEGER DEFAULT 0
         )
     ''')
-
-    # Add emoji column if it doesn't exist (migration for existing DBs)
-    try:
-        cursor.execute("ALTER TABLE products ADD COLUMN emoji TEXT DEFAULT ''")
-        conn.commit()
-    except Exception:
-        conn.rollback()  # MUST rollback after failed ALTER or PostgreSQL aborts all subsequent queries
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS orders (
@@ -105,7 +97,7 @@ def get_users():
 def get_products():
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT id, name, description, price, image_url, stock, COALESCE(emoji, \'\') as emoji FROM products WHERE deleted = 0')
+    cursor.execute('SELECT id, name, description, price, image_url, stock FROM products WHERE deleted = 0')
     products = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -115,7 +107,7 @@ def get_product(product_id):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, name, description, price, image_url, stock, COALESCE(emoji, '') as emoji FROM products WHERE id = %s AND deleted = 0",
+        'SELECT id, name, description, price, image_url, stock FROM products WHERE id = %s AND deleted = 0',
         (product_id,)
     )
     product = cursor.fetchone()
@@ -233,14 +225,6 @@ def update_product_name(product_id, new_name):
     cursor.close()
     conn.close()
 
-def update_product_emoji(product_id, emoji):
-    """Set or update the emoji for a product."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE products SET emoji = %s WHERE id = %s', (emoji, product_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
 
 def get_user_count():
     """Return total number of unique users who have used the bot."""

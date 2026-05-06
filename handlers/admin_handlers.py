@@ -21,6 +21,7 @@ class AdminState(StatesGroup):
     add_price = State()
     add_image = State()
     add_stock = State()
+    add_emoji = State()       # NEW: emoji step when adding product
 
     edit_price = State()
     edit_name = State()
@@ -28,6 +29,7 @@ class AdminState(StatesGroup):
     edit_stock = State()
     notify_customers = State()
 
+    set_emoji = State()       # NEW: custom emoji input for existing product
     send_account = State()
     add_admin_id = State()
 
@@ -159,7 +161,96 @@ async def admin_set_img(callback: CallbackQuery, state: FSMContext):
 async def process_edit_image(message: Message, state: FSMContext):
     data = await state.get_data()
     db.update_product_image(data['pid'], message.text)
-    await message.answer("✅ កែប្រែរូបភាពជោគជ័យ!", reply_markup=kb.get_admin_main_menu())
+    await message.answer("✅ កែប្រែរូបភាពជោកជ័យ!", reply_markup=kb.get_admin_main_menu())
+    await state.clear()
+
+# --- Set Emoji (Animated) ---
+@router.message(F.text == "✨ ដាក់ Emoji ចលនា (Set Emoji)")
+async def admin_set_emoji_menu(message: Message):
+    if not is_admin(message.from_user.id): return
+    products = db.get_products()
+    if not products:
+        await message.answer("មិនតាន់មានផលិតផលតើ។", reply_markup=kb.get_admin_main_menu())
+        return
+    # Show emoji current status for each product
+    lines = []
+    for p in products:
+        emoji = p[6] if len(p) > 6 and p[6] else "➖"
+        lines.append(f"{emoji} {p[1]}")
+    text = "✨ **ចំនួន Emoji ផលិតផលនិម្យន្នាក់៖**\n\n" + "\n".join(lines)
+    text += "\n\nសូមជ្រើសរើសផលិតផលដែលចង់ដាក់ Emoji៖"
+    await message.answer(text, parse_mode="Markdown",
+                         reply_markup=kb.get_admin_products_keyboard(products, "admin_set_emoji"))
+
+@router.callback_query(F.data.startswith("admin_set_emoji_"))
+async def admin_set_emoji_pick_product(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id): return
+    pid = int(callback.data.split("_")[3])
+    product = db.get_product(pid)
+    await state.update_data(pid=pid)
+    current_emoji = product[6] if product and len(product) > 6 and product[6] else "➖"
+    await callback.message.edit_text(
+        f"✨ **ដាក់ Emoji ចលនា**\n\n"
+        f"ផលិតផល៖ **{product[1]}**\n"
+        f"Emoji បច្ចុប្បន៖ {current_emoji}\n\n"
+        f"ជ្រើសរើស Emoji ភ្លាម ហើបវាយដោយខ្លួនឯង៖",
+        parse_mode="Markdown",
+        reply_markup=kb.get_emoji_picker_keyboard(pid)
+    )
+    await callback.answer()
+
+# Emoji picker quick-select for EXISTING product
+@router.callback_query(F.data.startswith("admin_emoji_pick_"))
+async def admin_emoji_pick(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id): return
+    parts = callback.data.split("_")  # admin_emoji_pick_{pid}_{emoji}
+    # pid is parts[3], emoji could contain underscores — rejoin from index 4
+    pid = int(parts[3])
+    if pid == 0:
+        # Handled by add_product_emoji_pick above
+        return
+    raw_emoji = "_".join(parts[4:]) if len(parts) > 4 else "none"
+    emoji = "" if raw_emoji == "none" else raw_emoji
+    db.update_product_emoji(pid, emoji)
+    product = db.get_product(pid)
+    msg = f"✅ បានដាក់ Emoji **{emoji}** ត្រង់ឡើ **{product[1]}** ជោកជ័យ!" if emoji else f"✅ បានលុប Emoji ចេញពី **{product[1]}**"
+    await callback.message.edit_text(msg, parse_mode="Markdown")
+    await callback.message.answer("🛠 **Admin Dashboard**", reply_markup=kb.get_admin_main_menu())
+    await callback.answer()
+
+# Admin wants to type custom emoji for existing product
+@router.callback_query(F.data.startswith("admin_emoji_custom_"))
+async def admin_emoji_custom_start(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id): return
+    pid = int(callback.data.split("_")[3])
+    if pid == 0:
+        # new product — just prompt, state already set to add_emoji
+        await callback.message.edit_text(
+            "⌨️ វាយ Emoji ដោយខ្លួនឯង (ហើបផឥក្ផង Emoji មួយវាយ skip ន្ឡងមិនដាក់):"
+        )
+        await callback.answer()
+        return
+    await state.update_data(pid=pid)
+    await callback.message.edit_text(
+        "⌨️ **វាយ Emoji ដោយខ្លួនឯង**\n\n"
+        "ហើបផឥក្ផង Emoji មួយ Copy នឹង Paste ចូលទៅនេជ៖\n"
+        "(ហើបវាយ none ដែលចង់លុប Emoji)",
+        parse_mode="Markdown",
+        reply_markup=kb.get_cancel_admin_keyboard()
+    )
+    await state.set_state(AdminState.set_emoji)
+    await callback.answer()
+
+@router.message(AdminState.set_emoji)
+async def process_set_emoji(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id): return
+    data = await state.get_data()
+    pid = data.get('pid')
+    emoji = "" if message.text.lower() == "none" else message.text.strip()
+    db.update_product_emoji(pid, emoji)
+    product = db.get_product(pid)
+    msg = f"✅ បានដាក់ Emoji **{emoji}** នៅ **{product[1]}** ជោគជ័យ!" if emoji else f"✅ បានលុប Emoji ចេញពី **{product[1]}**"
+    await message.answer(msg, parse_mode="Markdown", reply_markup=kb.get_admin_main_menu())
     await state.clear()
 
 # --- Add Stock ---

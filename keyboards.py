@@ -20,12 +20,14 @@ def get_back_keyboard():
 def get_products_keyboard(products):
     builder = InlineKeyboardBuilder()
     for prod in products:
-        # prod is (id, name, description, price, image_url, stock)
+        # prod is (id, name, description, price, image_url, stock, emoji)
+        emoji = prod[6] if len(prod) > 6 and prod[6] else ""
         stock_text = f" (ស្តុក: {prod[5]})" if prod[5] >= 0 else ""
+        display_name = f"{emoji} {prod[1]}".strip() if emoji else prod[1]
         if prod[5] == 0:
             builder.button(text=f"❌ អស់ស្តុក - {prod[1]}", callback_data=f"buy_{prod[0]}")
         else:
-            builder.button(text=f"{prod[1]} - {prod[3]}{stock_text}", callback_data=f"buy_{prod[0]}")
+            builder.button(text=f"{display_name} - {prod[3]}{stock_text}", callback_data=f"buy_{prod[0]}")
     builder.button(text="🔙 ត្រឡប់ក្រោយ", callback_data="start_menu")
     builder.adjust(1)
     return builder.as_markup()
@@ -50,12 +52,13 @@ def get_admin_main_menu():
     builder.button(text="✏️ កែប្រែតម្លៃ (Edit Price)")
     builder.button(text="🏷️ កែប្រែឈ្មោះ (Rename Product)")
     builder.button(text="🖼️ ដាក់រូបភាព (Set Picture)")
+    builder.button(text="✨ ដាក់ Emoji ចលនា (Set Emoji)")
     builder.button(text="📦 បន្ថែមស្តុក (Add Stock)")
     builder.button(text="Delete Product")
     builder.button(text="Notify Customers")
     builder.button(text="👥 ស្ថិតិអ្នកប្រើ (Bot Stats)")
     builder.button(text="👑 គ្រប់គ្រង Admin")
-    builder.adjust(2, 2, 2, 2, 1)
+    builder.adjust(2, 2, 2, 2, 2)
     return builder.as_markup(resize_keyboard=True)
 
 def get_admin_products_keyboard(products, action_prefix):
@@ -88,4 +91,32 @@ def get_admin_list_keyboard(admins, main_admin_id):
 def get_cancel_admin_keyboard():
     builder = InlineKeyboardBuilder()
     builder.button(text="❌ បោះបង់", callback_data="admin_main_menu")
+    return builder.as_markup()
+
+def get_emoji_picker_keyboard(product_id):
+    """Quick emoji suggestions for admin to pick from."""
+    builder = InlineKeyboardBuilder()
+    emojis = [
+        ("🔥 Hot",       "🔥"),
+        ("⚡ Flash",     "⚡"),
+        ("✨ Sparkle",   "✨"),
+        ("💎 Diamond",   "💎"),
+        ("🏆 Trophy",   "🏆"),
+        ("🎯 Target",   "🎯"),
+        ("💫 Dizzy",    "💫"),
+        ("🎁 Gift",      "🎁"),
+        ("🚀 Rocket",   "🚀"),
+        ("⭐ Star",     "⭐"),
+        ("👑 Crown",    "👑"),
+        ("💡 Idea",     "💡"),
+    ]
+    for label, emoji in emojis:
+        builder.button(
+            text=label,
+            callback_data=f"admin_emoji_pick_{product_id}_{emoji}"
+        )
+    builder.button(text="🗑️ លុប Emoji",   callback_data=f"admin_emoji_pick_{product_id}_none")
+    builder.button(text="⌨️ វាយដោយខ្លួនឯង", callback_data=f"admin_emoji_custom_{product_id}")
+    builder.button(text="❌ បោះបង់",        callback_data="admin_main_menu")
+    builder.adjust(3, 3, 3, 3, 2, 1)
     return builder.as_markup()

@@ -37,8 +37,9 @@ def setup_db():
     # Add emoji column if it doesn't exist (migration for existing DBs)
     try:
         cursor.execute("ALTER TABLE products ADD COLUMN emoji TEXT DEFAULT ''")
+        conn.commit()
     except Exception:
-        pass  # Column already exists
+        conn.rollback()  # MUST rollback after failed ALTER or PostgreSQL aborts all subsequent queries
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS orders (
